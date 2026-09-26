@@ -22,8 +22,9 @@ di avvio, usata da tutte le fasi.
    esecuzione lo tiene, scrive un errore ed esce con `1`. Il lock si libera da solo
    quando il processo termina, anche in caso di crash.
 3. Carica `netbox.env` se esiste.
-4. Esegue `run_inventory.sh` forzando `PUSH_TO_NETBOX=false`, con l'output accodato al
-   log principale.
+4. Esegue `run_inventory.sh` con `INVENTORY_RUN_ALL=1`, che gli impedisce di inviare
+   dati a NetBox (l'invio avviene una volta sola, al passo 8, con TCP e UDP). L'output
+   viene accodato al log principale.
 5. Se `work/hosts_up_<data>.txt` è vuoto: nessun host trovato, esce con `0`.
 6. Esegue `run_udp_enrichment.sh`.
 7. Verifica che esista `work/normalized_assets_merged_<data>.json`.
@@ -45,6 +46,8 @@ qualcosa esce con `1` indicando cosa.
 
 **Variabili lette**: `DATE_TAG` (predefinita: la data odierna), `PUSH_TO_NETBOX`
 (predefinita `false`), `ANSIBLE_INVENTORY_FILE`, più tutto `netbox.env`.
+`INVENTORY_RUN_ALL=1`, impostata da `run_all_inventory.sh`, disattiva l'invio a NetBox
+qualunque sia il valore di `PUSH_TO_NETBOX`.
 
 **Sequenza**
 
@@ -61,7 +64,8 @@ qualcosa esce con `1` indicando cosa.
    servizi ed esce con `0`.
 9. `sudo -n inventory-nmap tcp-services <porte> < hosts_up.txt > scans/services_<data>.xml`
 10. `normalize_for_netbox.py` unisce i tre XML → `work/normalized_assets_<data>.json`
-11. Se `PUSH_TO_NETBOX` è `true` (solo lanciando lo script da solo): invia il JSON TCP a NetBox.
+11. Se `PUSH_TO_NETBOX` è `true` e lo script è stato lanciato da solo: invia il JSON TCP
+    a NetBox.
 
 `sudo -n` fa fallire subito il comando se sudo chiederebbe una password, invece di
 restare in attesa: in cron non c'è nessuno a rispondere.
@@ -229,14 +233,27 @@ presenti nell'ambiente. Richiede `NETBOX_URL` e `NETBOX_TOKEN` (non vuoti e dive
 1. Calcola l'indirizzo `IP/32` (`IP/128` per IPv6).
 2. Cerca in NetBox un IP Address con esattamente quell'indirizzo:
    `GET /api/ipam/ip-addresses/?address=<ip>/32`.
-3. Se esiste lo aggiorna (`PATCH`), altrimenti lo crea (`POST`), con il payload:
+3. Se non esiste lo crea (`POST`) con indirizzo, stato, descrizione, campi
+   personalizzati e, se l'host ha un hostname, `dns_name`:
 
    ```json
    {
      "address": "192.0.2.10/32",
      "status": "active",
-     "dns_name": "",
      "description": "Scan di Nmap",
+     "custom_fields": {
+       "porte_tcp": "22, 80",
+       "porte_udp": "161?",
+       "servizi_dettaglio": "SSH (22/tcp) - OpenSSH 9.x protocol 2.0\n\nHTTP (80/tcp) - NGINX\n\nSNMP (161/udp) - candidate"
+     }
+   }
+   ```
+
+   Se esiste lo aggiorna (`PATCH`) inviando solo i campi personalizzati, così stato,
+   descrizione e nome DNS curati a mano restano invariati:
+
+   ```json
+   {
      "custom_fields": {
        "porte_tcp": "22, 80",
        "porte_udp": "161?",
@@ -266,9 +283,9 @@ Alla fine scrive `Completato. Asset: N | Errori: N` ed esce con `1` se ci sono e
 2. `unknown` e `tcpwrapped` sono sempre esclusi.
 3. Un servizio con prodotto, versione o informazioni aggiuntive è sempre incluso.
 4. Senza dettagli è incluso solo se il nome normalizzato è uno di: `ssh`, `http`,
-   `https`, `dns`, `dhcp`, `ntp`, `snmp`, `isakmp`, `syslog`, `zeroconf`, `mdns`, `upnp`,
-   `ldap`, `ldaps`, `rpcbind`, `nfs`, `msrpc`, `rdp`, `winbox`, `bandwidth-test`, `sip`,
-   `sip-tls`, `ipp`, `printer`, `amqp`.
+   `https`, `dns`, `dhcp`, `dhcp-client`, `ntp`, `snmp`, `isakmp`, `syslog`, `zeroconf`,
+   `mdns`, `upnp`, `ldap`, `ldaps`, `smb`, `netbios`, `rpcbind`, `nfs`, `msrpc`, `rdp`,
+   `winbox`, `bandwidth-test`, `sip`, `sip-tls`, `ipp`, `printer`, `amqp`.
 
 Le porte escluse dal dettaglio restano comunque in `porte_tcp` e `porte_udp`.
 

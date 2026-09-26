@@ -61,16 +61,17 @@ Nonostante il nome, contiene tutte le opzioni della pipeline oltre a quelle di N
 - Usa la forma `export NOME="valore"`. Racchiudi sempre i valori tra virgolette doppie.
 - Non mettere commenti in coda alla riga: `push_to_netbox.py`, quando viene lanciato da
   solo, legge il file con un parser semplice che li includerebbe nel valore.
-- Imposta `PUSH_TO_NETBOX` e `PUSH_TO_GLPI` solo per disattivare (`"false"`), lasciandoli
-  commentati altrimenti. Un `PUSH_TO_NETBOX="true"` esplicito viene letto anche dalla
-  fase TCP, che allora fa un invio in più a NetBox con i soli dati TCP. Se quell'invio
-  fallisce, l'esecuzione si interrompe prima della fase UDP.
+- `PUSH_TO_NETBOX` e `PUSH_TO_GLPI` valgono `true` se non impostate: basta scriverle per
+  disattivare un invio (`"false"`). Lasciarle commentate permette di disattivarle anche
+  per una singola esecuzione dalla riga di comando (vedi [Precedenza](#precedenza)).
 
 ### Precedenza
 
 Le variabili già presenti nell'ambiente prevalgono su quelle di `netbox.env` quando
 `push_to_netbox.py` viene lanciato da solo. Quando invece la pipeline parte da
 `run_all_inventory.sh`, il file viene caricato con `source` e i suoi valori prevalgono.
+Per questo `sudo -u inventory env PUSH_TO_GLPI=false /opt/inventory/nmap/run_all_inventory.sh`
+disattiva l'invio a GLPI solo se `PUSH_TO_GLPI` non è impostata in `netbox.env`.
 
 ## `glpi-nmap-adapter/.env`
 
@@ -122,7 +123,7 @@ Alcuni parametri non sono configurabili da file e vanno modificati nel codice.
 | Opzioni di Nmap | `deploy/inventory-nmap` | vedi [Riferimento script](riferimento-script.md#deployinventory-nmap) |
 | Percorso del wrapper | `nmap/run_inventory.sh`, `nmap/run_udp_enrichment.sh`, `deploy/sudoers-inventory` | `/usr/local/sbin/inventory-nmap` |
 | File di lock | `nmap/run_all_inventory.sh` | `/tmp/run_all_inventory.lock` |
-| Stato e descrizione in NetBox | `nmap/scripts/push_to_netbox.py` | `active`, `Scan di Nmap` |
+| Stato e descrizione dei nuovi IP in NetBox | `nmap/scripts/push_to_netbox.py` | `active`, `Scan di Nmap` |
 | Timeout delle richieste NetBox | `nmap/scripts/push_to_netbox.py` | 30 secondi |
 
 Le porte UDP predefinite:

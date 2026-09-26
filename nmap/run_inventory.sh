@@ -14,7 +14,7 @@ TARGET_SUBNET="$BASE_DIR/targets.txt"
 DATE_TAG="${DATE_TAG:-$(date +%F)}"
 RUN_LOG="$LOG_DIR/run_${DATE_TAG}.log"
 
-# true = abilita push su NetBox
+# true = abilita push su NetBox (solo se lo script è lanciato da solo)
 # false = genera solo i file
 PUSH_TO_NETBOX="${PUSH_TO_NETBOX:-false}"
 
@@ -57,6 +57,12 @@ fi
 if [[ -f "$BASE_DIR/netbox.env" ]]; then
   # shellcheck disable=SC1090
   source "$BASE_DIR/netbox.env"
+fi
+
+# Lanciato da run_all_inventory.sh: il push su NetBox lo fa lui alla fine, con i
+# dati TCP + UDP. Va deciso dopo netbox.env, che potrebbe impostare PUSH_TO_NETBOX
+if [[ "${INVENTORY_RUN_ALL:-}" == "1" ]]; then
+  PUSH_TO_NETBOX="false"
 fi
 
 log "Avvio pipeline inventory TCP"

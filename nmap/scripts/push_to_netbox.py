@@ -9,15 +9,16 @@ from typing import List, Dict, Any, Tuple
 import requests
 
 
+# Nomi già normalizzati (vedi normalize_service_name): domain -> dns,
+# dhcps/bootps -> dhcp, dhcpc/bootpc -> dhcp-client, microsoft-ds -> smb,
+# netbios-ssn -> netbios
 USEFUL_SERVICE_NAMES = {
     "ssh",
     "http",
     "https",
     "dns",
-    "domain",
     "dhcp",
-    "dhcps",
-    "dhcpc",
+    "dhcp-client",
     "ntp",
     "snmp",
     "isakmp",
@@ -27,8 +28,8 @@ USEFUL_SERVICE_NAMES = {
     "upnp",
     "ldap",
     "ldaps",
-    "microsoft-ds",
-    "netbios-ssn",
+    "smb",
+    "netbios",
     "rpcbind",
     "nfs",
     "msrpc",
@@ -39,8 +40,6 @@ USEFUL_SERVICE_NAMES = {
     "sip-tls",
     "ipp",
     "printer",
-    "bootps",
-    "bootpc",
     "amqp",
 }
 
@@ -412,25 +411,29 @@ def main():
             udp_ports_value = build_udp_ports_value(services)
             services_detail_value = build_services_detail_value(services)
 
-            payload = {
-                "address": address,
-                "status": "active",
-                "dns_name": hostname or "",
-                "description": "Scan di Nmap",
-                "custom_fields": {
-                    cf_tcp_ports: tcp_ports_value,
-                    cf_udp_ports: udp_ports_value,
-                    cf_services_detail: services_detail_value,
-                }
+            custom_fields = {
+                cf_tcp_ports: tcp_ports_value,
+                cf_udp_ports: udp_ports_value,
+                cf_services_detail: services_detail_value,
             }
 
             existing = find_ip(session, base_api, address)
 
             if existing:
+                # Su un IP esistente si aggiornano solo porte e servizi: stato,
+                # descrizione e nome DNS possono essere stati curati a mano
                 detail_url = f"{base_api}/ipam/ip-addresses/{existing['id']}/"
-                nb_patch(session, detail_url, payload)
+                nb_patch(session, detail_url, {"custom_fields": custom_fields})
                 print(f"[UPDATE] {address}")
             else:
+                payload = {
+                    "address": address,
+                    "status": "active",
+                    "description": "Scan di Nmap",
+                    "custom_fields": custom_fields,
+                }
+                if hostname:
+                    payload["dns_name"] = hostname
                 nb_post(session, f"{base_api}/ipam/ip-addresses/", payload)
                 print(f"[CREATE] {address}")
 

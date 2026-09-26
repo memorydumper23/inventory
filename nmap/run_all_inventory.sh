@@ -54,7 +54,8 @@ PUSH_TO_GLPI="${PUSH_TO_GLPI:-true}"
 ###############################################################################
 
 log "Eseguo pipeline TCP"
-/usr/bin/env PUSH_TO_NETBOX=false "$BASE_DIR/run_inventory.sh" >> "$RUN_LOG" 2>&1
+# INVENTORY_RUN_ALL: la fase TCP non invia nulla, il push si fa sotto con TCP + UDP
+/usr/bin/env INVENTORY_RUN_ALL=1 "$BASE_DIR/run_inventory.sh" >> "$RUN_LOG" 2>&1
 
 if [[ ! -s "$WORK_DIR/hosts_up_${DATE_TAG}.txt" ]]; then
   log "Nessun host up trovato. Niente da sincronizzare."

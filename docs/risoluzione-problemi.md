@@ -123,11 +123,12 @@ o correggi i nomi in `netbox.env`.
 **Soluzione**: uniforma gli IP gestiti dalla pipeline a `/32`, oppure cancella i
 duplicati creati e registra gli host a `/32`.
 
-### `dns_name`, `description` o `status` inseriti a mano vengono sovrascritti
+### Su un IP esistente `dns_name`, `description` o `status` non cambiano
 
-È il comportamento attuale: a ogni esecuzione la pipeline scrive `status: active`,
-`description: Scan di Nmap` e il `dns_name` rilevato (vuoto se il target non era
-indicato per nome). Vedi [Architettura → Limiti noti](architettura.md#limiti-noti).
+È voluto: sugli IP già presenti in NetBox la pipeline aggiorna solo i tre campi
+personalizzati, per non cancellare valori curati a mano. Stato, descrizione e nome DNS
+vengono scritti solo quando la pipeline crea l'IP (vedi
+[Architettura → NetBox](architettura.md#netbox)).
 
 ## GLPI
 

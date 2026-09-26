@@ -196,17 +196,19 @@ esecuzioni successive aggiornano l'asset invece di crearne uno nuovo:
 
 ### NetBox
 
-Per ogni host la pipeline gestisce un *IP Address* `192.0.2.10/32` con:
+Per ogni host la pipeline gestisce un *IP Address* `192.0.2.10/32`. I tre campi
+personalizzati vengono scritti a ogni esecuzione; gli altri campi solo quando l'IP viene
+creato, così i valori curati a mano su un IP esistente non vengono toccati.
 
-| Campo NetBox | Valore |
-|---|---|
-| `address` | IP con maschera `/32` |
-| `status` | `active` |
-| `dns_name` | `hostname` se presente, altrimenti vuoto |
-| `description` | `Scan di Nmap` |
-| `porte_tcp` (campo personalizzato) | `22, 80, 443` |
-| `porte_udp` (campo personalizzato) | `53, 161?`: il `?` indica una porta `open\|filtered` |
-| `servizi_dettaglio` (campo personalizzato) | un servizio per riga, separati da una riga vuota, per esempio `SSH (22/tcp) - OpenSSH 9.x` |
+| Campo NetBox | Valore | Quando |
+|---|---|---|
+| `address` | IP con maschera `/32` | alla creazione |
+| `status` | `active` | alla creazione |
+| `dns_name` | `hostname`, se presente | alla creazione |
+| `description` | `Scan di Nmap` | alla creazione |
+| `porte_tcp` (campo personalizzato) | `22, 80, 443` | sempre |
+| `porte_udp` (campo personalizzato) | `53, 161?`: il `?` indica una porta `open\|filtered` | sempre |
+| `servizi_dettaglio` (campo personalizzato) | un servizio per riga, separati da una riga vuota, per esempio `SSH (22/tcp) - OpenSSH 9.x` | sempre |
 
 Le regole di formattazione e di filtro dei servizi sono in
 [Riferimento script → push_to_netbox.py](riferimento-script.md#scriptspush_to_netboxpy).
@@ -250,9 +252,6 @@ sotto `all.hosts`. Il file viene riscritto per intero: eventuali commenti vanno 
   maschera della sua subnet (per esempio `192.0.2.10/24`) non viene riconosciuto e
   la pipeline crea un secondo record `192.0.2.10/32`. Le VRF non vengono considerate:
   se lo stesso indirizzo esiste in più VRF viene aggiornato il primo trovato.
-- **NetBox: campi sovrascritti.** Per gli IP esistenti la pipeline riscrive `status`,
-  `dns_name` e `description`: valori inseriti a mano in questi campi vengono persi
-  (`dns_name` diventa vuoto se il target non era indicato per nome).
 - **GLPI: deduplica affidata al file di stato.** Se `glpi_nmap_state_legacy.json` va
   perso, la pipeline crea nuovi asset per tutti gli host invece di aggiornare quelli esistenti.
 - **Hostname solo per target indicati per nome.** Le scansioni non interrogano il DNS.
