@@ -1,0 +1,64 @@
+#!/bin/bash
+# Wrapper eseguito come root via sudo (vedi deploy/sudoers-inventory).
+#
+# Dare a un utente "sudo nmap" equivale a dargli root: --script esegue codice Lua,
+# -iL legge qualunque file, -oX scrive dove vuole. Questo wrapper espone solo i
+# cinque profili di scansione usati dalla pipeline, con opzioni fisse:
+#   - i target arrivano da stdin e l'XML esce su stdout, quindi nmap non apre
+#     nessun file (niente letture o sovrascritture come root, niente symlink attack)
+#   - l'unico parametro ammesso è una lista di porte numeriche
+#
+# Installazione (il file deve essere di root e non scrivibile da altri):
+#   sudo install -o root -g root -m 0755 deploy/inventory-nmap /usr/local/sbin/inventory-nmap
+set -euo pipefail
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export HOME=/root
+unset NMAPDIR
+
+NMAP=/usr/bin/nmap
+PORTSPEC_RE='^[0-9]{1,5}(,[0-9]{1,5})*$'
+
+die() {
+  echo "inventory-nmap: $*" >&2
+  exit 2
+}
+
+no_args() {
+  [[ $# -eq 0 ]] || die "il profilo non accetta argomenti"
+}
+
+portspec() {
+  [[ $# -eq 1 && $1 =~ $PORTSPEC_RE ]] || die "lista porte non valida (attese solo cifre separate da virgole)"
+  printf '%s' "$1"
+}
+
+MODE="${1:-}"
+shift || true
+
+case "$MODE" in
+  discovery)
+    no_args "$@"
+    exec "$NMAP" -PR -sn -n -iL - -oX -
+    ;;
+  tcp-ports)
+    no_args "$@"
+    exec "$NMAP" -sS -Pn -n -p- --host-timeout 10m --min-hostgroup 4 --max-hostgroup 10 \
+      --min-rate 5000 -iL - -oX -
+    ;;
+  tcp-services)
+    PORTS="$(portspec "$@")"
+    exec "$NMAP" -sV -Pn -n --version-light -p "$PORTS" -iL - -oX -
+    ;;
+  udp-ports)
+    PORTS="$(portspec "$@")"
+    exec "$NMAP" -sU -Pn -n -T4 --max-retries 2 -p "$PORTS" -iL - -oX -
+    ;;
+  udp-services)
+    PORTS="$(portspec "$@")"
+    exec "$NMAP" -sU -sV -Pn -n -T4 --version-light --max-retries 1 -p "$PORTS" -iL - -oX -
+    ;;
+  *)
+    die "uso: inventory-nmap {discovery|tcp-ports|tcp-services|udp-ports|udp-services} [porte] < target > output.xml"
+    ;;
+esac

@@ -1,0 +1,23 @@
+# Configurazione locale con credenziali: usa i file *.example come modello
+.env
+.env.*
+*.env
+!*.env.example
+
+# Target di scansione (usa nmap/targets.txt.example)
+nmap/targets.txt
+
+# Output generati dalle scansioni
+nmap/logs/
+nmap/scans/
+nmap/work/
+*.log
+
+# Stato locale IP -> ID GLPI
+glpi-nmap-adapter/*_state*.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc

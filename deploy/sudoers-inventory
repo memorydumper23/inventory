@@ -1,0 +1,12 @@
+# Regola sudo per inventory: l'utente che esegue la pipeline può lanciare
+# come root solo il wrapper /usr/local/sbin/inventory-nmap, non nmap direttamente.
+# Sostituisci "inventory" con l'utente che esegue il cron.
+#
+# Installazione:
+#   sudo visudo -cf deploy/sudoers-inventory
+#   sudo install -o root -g root -m 0440 deploy/sudoers-inventory /etc/sudoers.d/inventory
+
+# cron non ha un terminale: su distribuzioni con requiretty sudo fallirebbe
+Defaults!/usr/local/sbin/inventory-nmap !requiretty
+
+inventory ALL=(root) NOPASSWD: /usr/local/sbin/inventory-nmap
