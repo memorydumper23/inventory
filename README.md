@@ -4,6 +4,9 @@ Pipeline di network inventory basata su Nmap: scopre gli host di una o più subn
 rileva porte TCP/UDP e servizi, e sincronizza i risultati su **NetBox**, **GLPI**
 e (opzionalmente) su un inventory **Ansible**.
 
+📖 Documentazione completa in [`docs/`](docs/README.md): architettura, installazione,
+configurazione, esecuzione, riferimento degli script, sicurezza e risoluzione problemi.
+
 ```
 nmap/
   run_all_inventory.sh      # entrypoint: TCP -> UDP -> push NetBox -> push GLPI
@@ -15,6 +18,7 @@ glpi-nmap-adapter/
 deploy/
   inventory-nmap            # wrapper root: unico comando concesso via sudo
   sudoers-inventory         # regola sudo ristretta al wrapper
+docs/                       # documentazione completa
 ```
 
 ## Requisiti
