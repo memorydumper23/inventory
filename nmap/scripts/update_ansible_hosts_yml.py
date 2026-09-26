@@ -6,7 +6,7 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:
-    print("[ERRORE] PyYAML non installato. Installa python3-yaml.", file=sys.stderr)
+    print("[ERROR] PyYAML is not installed. Install python3-yaml.", file=sys.stderr)
     sys.exit(1)
 
 
@@ -24,7 +24,7 @@ def read_hosts_txt(path):
                     seen.add(host)
                     hosts.append(host)
     except Exception as exc:
-        raise RuntimeError(f"Impossibile leggere {path}: {exc}") from exc
+        raise RuntimeError(f"Cannot read {path}: {exc}") from exc
 
     return sorted(hosts)
 
@@ -38,7 +38,7 @@ def load_yaml(path):
             data = yaml.safe_load(f) or {}
         return data
     except Exception as exc:
-        raise RuntimeError(f"Impossibile leggere YAML {path}: {exc}") from exc
+        raise RuntimeError(f"Cannot read YAML {path}: {exc}") from exc
 
 
 def save_yaml(path, data):
@@ -52,15 +52,15 @@ def save_yaml(path, data):
                 allow_unicode=True
             )
     except Exception as exc:
-        raise RuntimeError(f"Impossibile scrivere YAML {path}: {exc}") from exc
+        raise RuntimeError(f"Cannot write YAML {path}: {exc}") from exc
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Aggiorna un hosts.yml Ansible aggiungendo gli host da hosts_up.txt"
+        description="Update an Ansible hosts.yml by adding the hosts listed in hosts_up.txt"
     )
-    parser.add_argument("--input", required=True, help="File TXT input (un host per riga)")
-    parser.add_argument("--inventory", required=True, help="File hosts.yml da aggiornare")
+    parser.add_argument("--input", required=True, help="Input TXT file (one host per line)")
+    parser.add_argument("--inventory", required=True, help="hosts.yml file to update")
     args = parser.parse_args()
 
     try:
@@ -76,19 +76,19 @@ def main():
         if "hosts" not in data["all"] or not isinstance(data["all"]["hosts"], dict):
             data["all"]["hosts"] = {}
 
-        # preserva gli host già presenti e aggiunge quelli scoperti
+        # keep the existing hosts and add the discovered ones
         for host in discovered_hosts:
             if host not in data["all"]["hosts"]:
                 data["all"]["hosts"][host] = {}
 
-        # opzionale: riordino host per IP
+        # sort hosts by IP
         sorted_hosts = dict(sorted(data["all"]["hosts"].items(), key=lambda x: x[0]))
         data["all"]["hosts"] = sorted_hosts
 
         save_yaml(args.inventory, data)
 
     except Exception as exc:
-        print(f"[ERRORE] {exc}", file=sys.stderr)
+        print(f"[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
 
 

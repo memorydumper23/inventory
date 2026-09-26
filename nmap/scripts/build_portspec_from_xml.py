@@ -12,14 +12,14 @@ def is_interesting_state(protocol, state):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Costruisce una portspec Nmap da un XML di open ports"
+        description="Build an Nmap port list from an XML of open ports"
     )
-    parser.add_argument("--input", required=True, help="File XML Nmap in input")
+    parser.add_argument("--input", required=True, help="Input Nmap XML file")
     parser.add_argument(
         "--protocol",
         choices=["tcp", "udp", "both"],
         default="both",
-        help="Protocollo da includere nella portspec"
+        help="Protocol to include in the port list"
     )
     args = parser.parse_args()
 
@@ -27,7 +27,7 @@ def main():
         tree = ET.parse(args.input)
         root = tree.getroot()
     except Exception as exc:
-        print(f"[ERRORE] Impossibile leggere XML {args.input}: {exc}", file=sys.stderr)
+        print(f"[ERROR] Cannot read XML {args.input}: {exc}", file=sys.stderr)
         sys.exit(1)
 
     tcp_ports = set()

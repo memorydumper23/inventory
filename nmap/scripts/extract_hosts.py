@@ -12,16 +12,16 @@ def get_ipv4(host):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Estrae host up da XML Nmap")
-    parser.add_argument("--input", required=True, help="File XML Nmap in input")
-    parser.add_argument("--output", required=True, help="File TXT output (un IP per riga)")
+    parser = argparse.ArgumentParser(description="Extract the hosts that are up from an Nmap XML")
+    parser.add_argument("--input", required=True, help="Input Nmap XML file")
+    parser.add_argument("--output", required=True, help="Output TXT file (one IP per line)")
     args = parser.parse_args()
 
     try:
         tree = ET.parse(args.input)
         root = tree.getroot()
     except Exception as exc:
-        print(f"[ERRORE] Impossibile leggere XML {args.input}: {exc}", file=sys.stderr)
+        print(f"[ERROR] Cannot read XML {args.input}: {exc}", file=sys.stderr)
         sys.exit(1)
 
     hosts_found = set()
@@ -40,7 +40,7 @@ def main():
             for ip in sorted(hosts_found):
                 f.write(ip + "\n")
     except Exception as exc:
-        print(f"[ERRORE] Impossibile scrivere {args.output}: {exc}", file=sys.stderr)
+        print(f"[ERROR] Cannot write {args.output}: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

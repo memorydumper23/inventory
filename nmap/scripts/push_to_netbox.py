@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Tuple
 import requests
 
 
-# Nomi già normalizzati (vedi normalize_service_name): domain -> dns,
+# Already normalized names (see normalize_service_name): domain -> dns,
 # dhcps/bootps -> dhcp, dhcpc/bootpc -> dhcp-client, microsoft-ds -> smb,
 # netbios-ssn -> netbios
 USEFUL_SERVICE_NAMES = {
@@ -96,8 +96,8 @@ def eprint(*args, **kwargs):
 
 def load_env_file(path: str):
     """
-    Carica un file tipo netbox.env se esiste, senza sovrascrivere env già presenti.
-    Supporta righe tipo:
+    Load a netbox.env-style file if it exists, without overriding variables
+    already set in the environment. Supports lines such as:
       export NAME="value"
       NAME="value"
     """
@@ -124,13 +124,13 @@ def load_env_file(path: str):
                 if key and key not in os.environ:
                     os.environ[key] = value
     except Exception as exc:
-        eprint(f"[WARN] Impossibile leggere {path}: {exc}")
+        eprint(f"[WARN] Cannot read {path}: {exc}")
 
 
 def get_env(name: str, required: bool = True, default: str = None) -> str:
     value = os.getenv(name, default)
     if required and (not value or value == "CHANGE_ME"):
-        eprint(f"[ERRORE] Variabile ambiente mancante: {name}")
+        eprint(f"[ERROR] Missing environment variable: {name}")
         sys.exit(1)
     return value
 
@@ -236,7 +236,7 @@ def build_tcp_ports_value(services: List[Dict[str, Any]]) -> str:
 
 def build_udp_ports_value(services: List[Dict[str, Any]]) -> str:
     """
-    Esempi:
+    Examples:
       53
       67?
       161?
@@ -284,7 +284,7 @@ def should_keep_service_in_detail(svc: Dict[str, Any]) -> bool:
 
 def build_detail_line(svc: Dict[str, Any]) -> str:
     """
-    Formato:
+    Format:
     SSH (22/tcp) - OpenSSH 9.x
 
     SNMP (161/udp) - candidate
@@ -319,7 +319,7 @@ def build_detail_line(svc: Dict[str, Any]) -> str:
 
 def build_services_detail_value(services: List[Dict[str, Any]]) -> str:
     """
-    Multilinea con una riga vuota tra i servizi.
+    Multi-line, with a blank line between services.
     """
     lines = []
 
@@ -360,21 +360,21 @@ def find_ip(session: requests.Session, base_api: str, address: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Sincronizza IP address su NetBox")
-    parser.add_argument("--input", required=True, help="JSON normalizzato/merged in input")
+    parser = argparse.ArgumentParser(description="Sync IP addresses to NetBox")
+    parser.add_argument("--input", required=True, help="Normalized (or merged) JSON input file")
     args = parser.parse_args()
 
-    # Carica netbox.env se presente
+    # Load netbox.env if present
     load_env_file(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "netbox.env"))
 
     netbox_url = get_env("NETBOX_URL")
     netbox_token = get_env("NETBOX_TOKEN")
     verify_ssl = as_bool(get_env("NETBOX_VERIFY_SSL", required=False, default="true"))
 
-    # Internal name dei custom fields NetBox
-    cf_tcp_ports = get_env("NETBOX_CF_TCP_PORTS", required=False, default="porte_tcp")
-    cf_udp_ports = get_env("NETBOX_CF_UDP_PORTS", required=False, default="porte_udp")
-    cf_services_detail = get_env("NETBOX_CF_SERVICES_DETAIL", required=False, default="servizi_dettaglio")
+    # Internal names of the NetBox custom fields
+    cf_tcp_ports = get_env("NETBOX_CF_TCP_PORTS", required=False, default="tcp_ports")
+    cf_udp_ports = get_env("NETBOX_CF_UDP_PORTS", required=False, default="udp_ports")
+    cf_services_detail = get_env("NETBOX_CF_SERVICES_DETAIL", required=False, default="services_detail")
 
     base_api = netbox_url.rstrip("/") + "/api"
 
@@ -393,7 +393,7 @@ def main():
         with open(args.input, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception as exc:
-        eprint(f"[ERRORE] Impossibile leggere {args.input}: {exc}")
+        eprint(f"[ERROR] Cannot read {args.input}: {exc}")
         sys.exit(1)
 
     assets = data.get("assets", [])
@@ -420,8 +420,8 @@ def main():
             existing = find_ip(session, base_api, address)
 
             if existing:
-                # Su un IP esistente si aggiornano solo porte e servizi: stato,
-                # descrizione e nome DNS possono essere stati curati a mano
+                # Existing IPs only get ports and services updated: status,
+                # description and DNS name may have been curated by hand
                 detail_url = f"{base_api}/ipam/ip-addresses/{existing['id']}/"
                 nb_patch(session, detail_url, {"custom_fields": custom_fields})
                 print(f"[UPDATE] {address}")
@@ -429,7 +429,7 @@ def main():
                 payload = {
                     "address": address,
                     "status": "active",
-                    "description": "Scan di Nmap",
+                    "description": "Nmap scan",
                     "custom_fields": custom_fields,
                 }
                 if hostname:
@@ -438,13 +438,13 @@ def main():
                 print(f"[CREATE] {address}")
 
         except requests.exceptions.RequestException as exc:
-            eprint(f"[ERRORE] NetBox API per asset {asset}: {exc}")
+            eprint(f"[ERROR] NetBox API error for asset {asset}: {exc}")
             errors += 1
         except Exception as exc:
-            eprint(f"[ERRORE] Asset non processato {asset}: {exc}")
+            eprint(f"[ERROR] Asset not processed {asset}: {exc}")
             errors += 1
 
-    print(f"Completato. Asset: {len(assets)} | Errori: {errors}")
+    print(f"Done. Assets: {len(assets)} | Errors: {errors}")
     if errors:
         sys.exit(1)
 

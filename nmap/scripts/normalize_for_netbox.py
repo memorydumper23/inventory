@@ -25,7 +25,7 @@ def parse_hosts_xml(path):
         tree = ET.parse(path)
         root = tree.getroot()
     except Exception as exc:
-        raise RuntimeError(f"Impossibile leggere XML host discovery {path}: {exc}") from exc
+        raise RuntimeError(f"Cannot read host discovery XML {path}: {exc}") from exc
 
     for host in root.findall("host"):
         status = host.find("status")
@@ -54,11 +54,11 @@ def parse_hosts_xml(path):
 
 def merge_service(host_services, new_service):
     """
-    Se esiste già una entry con stessa porta/protocollo, la arricchisce.
+    If an entry with the same port/protocol already exists, enrich it.
     """
     for svc in host_services:
         if svc.get("port") == new_service.get("port") and svc.get("protocol") == new_service.get("protocol"):
-            # Stato: preferisci "open" rispetto a "open|filtered"
+            # State: prefer "open" over "open|filtered"
             old_state = svc.get("state")
             new_state = new_service.get("state")
             if old_state != "open" and new_state:
@@ -77,7 +77,7 @@ def parse_ports_xml(path, hosts):
         tree = ET.parse(path)
         root = tree.getroot()
     except Exception as exc:
-        raise RuntimeError(f"Impossibile leggere XML port discovery {path}: {exc}") from exc
+        raise RuntimeError(f"Cannot read port discovery XML {path}: {exc}") from exc
 
     for host in root.findall("host"):
         status = host.find("status")
@@ -133,7 +133,7 @@ def parse_services_xml(path, hosts):
         tree = ET.parse(path)
         root = tree.getroot()
     except Exception as exc:
-        raise RuntimeError(f"Impossibile leggere XML service/version detection {path}: {exc}") from exc
+        raise RuntimeError(f"Cannot read service/version detection XML {path}: {exc}") from exc
 
     for host in root.findall("host"):
         status = host.find("status")
@@ -213,11 +213,11 @@ def deduplicate_services(services):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Normalizza XML Nmap per NetBox")
-    parser.add_argument("--hosts", required=True, help="XML host discovery")
-    parser.add_argument("--ports", required=True, help="XML port discovery")
-    parser.add_argument("--services", required=True, help="XML service/version detection")
-    parser.add_argument("--output", required=True, help="JSON output")
+    parser = argparse.ArgumentParser(description="Normalize Nmap XML into a per-host JSON")
+    parser.add_argument("--hosts", required=True, help="Host discovery XML")
+    parser.add_argument("--ports", required=True, help="Port discovery XML")
+    parser.add_argument("--services", required=True, help="Service/version detection XML")
+    parser.add_argument("--output", required=True, help="Output JSON file")
     args = parser.parse_args()
 
     try:
@@ -236,7 +236,7 @@ def main():
             json.dump(output, f, indent=2, ensure_ascii=False)
 
     except Exception as exc:
-        print(f"[ERRORE] {exc}", file=sys.stderr)
+        print(f"[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
 
 

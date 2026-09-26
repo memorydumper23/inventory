@@ -8,7 +8,7 @@ LOG_DIR="$BASE_DIR/logs"
 
 GLPI_DIR_DEFAULT="$(cd "$BASE_DIR/.." && pwd)/glpi-nmap-adapter"
 
-# Data unica per tutta l'esecuzione (anche se si scavalca la mezzanotte)
+# One date for the whole run (even if it crosses midnight)
 export DATE_TAG="$(date +%F)"
 RUN_LOG="$LOG_DIR/run_all_${DATE_TAG}.log"
 LOCK_FILE="/tmp/run_all_inventory.lock"
@@ -21,21 +21,21 @@ log() {
 
 check_file() {
   if [[ ! -f "$1" ]]; then
-    echo "[ERRORE] File mancante: $1" >&2
+    echo "[ERROR] Missing file: $1" >&2
     exit 1
   fi
 }
 
-# Lock per evitare esecuzioni concorrenti da cron
+# Lock to prevent concurrent runs from cron
 exec 200>"$LOCK_FILE"
 if ! flock -n 200; then
-  echo "[ERRORE] Un'altra esecuzione è già in corso. Esco." | tee -a "$RUN_LOG"
+  echo "[ERROR] Another run is already in progress. Exiting." | tee -a "$RUN_LOG"
   exit 1
 fi
 
-log "Avvio run_all_inventory"
+log "Starting run_all_inventory"
 
-# Carica environment NetBox se presente
+# Load the NetBox environment if present
 if [[ -f "$BASE_DIR/netbox.env" ]]; then
   # shellcheck disable=SC1090
   source "$BASE_DIR/netbox.env"
@@ -45,7 +45,7 @@ GLPI_DIR="${GLPI_DIR:-$GLPI_DIR_DEFAULT}"
 GLPI_SCRIPT="$GLPI_DIR/nmap_to_glpi_nmap_asset.py"
 GLPI_VENV_PY="$GLPI_DIR/.venv/bin/python3"
 
-# PUSH_TO_NETBOX / PUSH_TO_GLPI = false per disabilitare il singolo push
+# PUSH_TO_NETBOX / PUSH_TO_GLPI = false disables that push
 PUSH_TO_NETBOX="${PUSH_TO_NETBOX:-true}"
 PUSH_TO_GLPI="${PUSH_TO_GLPI:-true}"
 
@@ -53,12 +53,12 @@ PUSH_TO_GLPI="${PUSH_TO_GLPI:-true}"
 # 1) TCP
 ###############################################################################
 
-log "Eseguo pipeline TCP"
-# INVENTORY_RUN_ALL: la fase TCP non invia nulla, il push si fa sotto con TCP + UDP
+log "Running TCP pipeline"
+# INVENTORY_RUN_ALL: the TCP phase sends nothing, the push happens below with TCP + UDP
 /usr/bin/env INVENTORY_RUN_ALL=1 "$BASE_DIR/run_inventory.sh" >> "$RUN_LOG" 2>&1
 
 if [[ ! -s "$WORK_DIR/hosts_up_${DATE_TAG}.txt" ]]; then
-  log "Nessun host up trovato. Niente da sincronizzare."
+  log "No hosts up. Nothing to sync."
   exit 0
 fi
 
@@ -66,35 +66,35 @@ fi
 # 2) UDP
 ###############################################################################
 
-log "Eseguo enrichment UDP"
+log "Running UDP enrichment"
 "$BASE_DIR/run_udp_enrichment.sh" >> "$RUN_LOG" 2>&1
 
 MERGED_JSON="$WORK_DIR/normalized_assets_merged_${DATE_TAG}.json"
 check_file "$MERGED_JSON"
 
-# I push sono indipendenti: un errore su uno non blocca l'altro
+# The pushes are independent: a failure in one does not block the other
 FAILED=()
 
 ###############################################################################
-# 3) PUSH FINALE SU NETBOX
+# 3) FINAL PUSH TO NETBOX
 ###############################################################################
 
 if [[ "$PUSH_TO_NETBOX" == "true" ]]; then
-  log "Eseguo push finale su NetBox dal merged JSON"
+  log "Running final push to NetBox from the merged JSON"
   if /usr/bin/python3 "$SCRIPT_DIR/push_to_netbox.py" \
     --input "$MERGED_JSON" \
     >> "$LOG_DIR/netbox_sync_${DATE_TAG}.log" 2>&1; then
-    log "Push NetBox completato con successo"
+    log "NetBox push completed successfully"
   else
-    log "[WARN] Push NetBox fallito. Controlla il log: $LOG_DIR/netbox_sync_${DATE_TAG}.log"
+    log "[WARN] NetBox push failed. Check the log: $LOG_DIR/netbox_sync_${DATE_TAG}.log"
     FAILED+=("NetBox")
   fi
 else
-  log "Push su NetBox DISABILITATO - salto sync"
+  log "NetBox push DISABLED - skipping sync"
 fi
 
 ###############################################################################
-# 4) PUSH FINALE SU GLPI
+# 4) FINAL PUSH TO GLPI
 ###############################################################################
 
 if [[ "$PUSH_TO_GLPI" == "true" ]]; then
@@ -102,33 +102,33 @@ if [[ "$PUSH_TO_GLPI" == "true" ]]; then
 
   if [[ -x "$GLPI_VENV_PY" ]]; then
     GLPI_PY="$GLPI_VENV_PY"
-    log "Uso Python del virtualenv GLPI: $GLPI_PY"
+    log "Using the GLPI virtualenv Python: $GLPI_PY"
   else
     GLPI_PY="/usr/bin/python3"
-    log "Virtualenv GLPI non trovato, provo con Python di sistema: $GLPI_PY"
+    log "GLPI virtualenv not found, trying the system Python: $GLPI_PY"
   fi
 
-  log "Eseguo push finale su GLPI dal merged JSON"
+  log "Running final push to GLPI from the merged JSON"
   if (
     cd "$GLPI_DIR"
     "$GLPI_PY" "$GLPI_SCRIPT" \
       -i "$MERGED_JSON" \
       -f json
   ) >> "$LOG_DIR/glpi_sync_${DATE_TAG}.log" 2>&1; then
-    log "Push GLPI completato con successo"
+    log "GLPI push completed successfully"
   else
-    log "[WARN] Push GLPI fallito. Controlla il log: $LOG_DIR/glpi_sync_${DATE_TAG}.log"
+    log "[WARN] GLPI push failed. Check the log: $LOG_DIR/glpi_sync_${DATE_TAG}.log"
     FAILED+=("GLPI")
   fi
 else
-  log "Push su GLPI DISABILITATO - salto sync"
+  log "GLPI push DISABLED - skipping sync"
 fi
 
 if (( ${#FAILED[@]} > 0 )); then
-  log "run_all_inventory completato con errori su: ${FAILED[*]}"
+  log "run_all_inventory completed with errors in: ${FAILED[*]}"
   log "Run log: $RUN_LOG"
   exit 1
 fi
 
-log "run_all_inventory completato con successo"
+log "run_all_inventory completed successfully"
 log "Run log: $RUN_LOG"

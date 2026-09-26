@@ -19,16 +19,16 @@ def is_interesting_state(protocol, state):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Estrae porte candidate da XML Nmap")
-    parser.add_argument("--input", required=True, help="File XML Nmap in input")
-    parser.add_argument("--output", required=True, help="File JSON output")
+    parser = argparse.ArgumentParser(description="Extract candidate ports from an Nmap XML")
+    parser.add_argument("--input", required=True, help="Input Nmap XML file")
+    parser.add_argument("--output", required=True, help="Output JSON file")
     args = parser.parse_args()
 
     try:
         tree = ET.parse(args.input)
         root = tree.getroot()
     except Exception as exc:
-        print(f"[ERRORE] Impossibile leggere XML {args.input}: {exc}", file=sys.stderr)
+        print(f"[ERROR] Cannot read XML {args.input}: {exc}", file=sys.stderr)
         sys.exit(1)
 
     result = {
@@ -80,7 +80,7 @@ def main():
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
     except Exception as exc:
-        print(f"[ERRORE] Impossibile scrivere JSON {args.output}: {exc}", file=sys.stderr)
+        print(f"[ERROR] Cannot write JSON {args.output}: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

@@ -1,14 +1,14 @@
 #!/bin/bash
-# Wrapper eseguito come root via sudo (vedi deploy/sudoers-inventory).
+# Wrapper run as root via sudo (see deploy/sudoers-inventory).
 #
-# Dare a un utente "sudo nmap" equivale a dargli root: --script esegue codice Lua,
-# -iL legge qualunque file, -oX scrive dove vuole. Questo wrapper espone solo i
-# cinque profili di scansione usati dalla pipeline, con opzioni fisse:
-#   - i target arrivano da stdin e l'XML esce su stdout, quindi nmap non apre
-#     nessun file (niente letture o sovrascritture come root, niente symlink attack)
-#   - l'unico parametro ammesso è una lista di porte numeriche
+# Giving a user "sudo nmap" is the same as giving them root: --script runs Lua
+# code, -iL reads any file, -oX writes anywhere. This wrapper exposes only the
+# five scan profiles used by the pipeline, with fixed options:
+#   - targets come in on stdin and the XML goes out on stdout, so nmap opens no
+#     file at all (no reads or overwrites as root, no symlink attacks)
+#   - the only accepted parameter is a list of numeric ports
 #
-# Installazione (il file deve essere di root e non scrivibile da altri):
+# Installation (the file must be owned by root and not writable by others):
 #   sudo install -o root -g root -m 0755 deploy/inventory-nmap /usr/local/sbin/inventory-nmap
 set -euo pipefail
 
@@ -25,11 +25,11 @@ die() {
 }
 
 no_args() {
-  [[ $# -eq 0 ]] || die "il profilo non accetta argomenti"
+  [[ $# -eq 0 ]] || die "this profile takes no arguments"
 }
 
 portspec() {
-  [[ $# -eq 1 && $1 =~ $PORTSPEC_RE ]] || die "lista porte non valida (attese solo cifre separate da virgole)"
+  [[ $# -eq 1 && $1 =~ $PORTSPEC_RE ]] || die "invalid port list (expected digits separated by commas only)"
   printf '%s' "$1"
 }
 
@@ -59,6 +59,6 @@ case "$MODE" in
     exec "$NMAP" -sU -sV -Pn -n -T4 --version-light --max-retries 1 -p "$PORTS" -iL - -oX -
     ;;
   *)
-    die "uso: inventory-nmap {discovery|tcp-ports|tcp-services|udp-ports|udp-services} [porte] < target > output.xml"
+    die "usage: inventory-nmap {discovery|tcp-ports|tcp-services|udp-ports|udp-services} [ports] < targets > output.xml"
     ;;
 esac

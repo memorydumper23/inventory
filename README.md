@@ -1,37 +1,37 @@
 # inventory
 
-Pipeline di network inventory basata su Nmap: scopre gli host di una o più subnet,
-rileva porte TCP/UDP e servizi, e sincronizza i risultati su **NetBox**, **GLPI**
-e (opzionalmente) su un inventory **Ansible**.
+Nmap-based network inventory pipeline: it discovers the hosts of one or more subnets,
+detects TCP/UDP ports and services, and syncs the results to **NetBox**, **GLPI**
+and (optionally) an **Ansible** inventory.
 
-📖 Documentazione completa in [`docs/`](docs/README.md): architettura, installazione,
-configurazione, esecuzione, riferimento degli script, sicurezza e risoluzione problemi.
+📖 Full documentation in [`docs/`](docs/README.md): architecture, installation,
+configuration, running, script reference, security and troubleshooting.
 
 ```
 nmap/
-  run_all_inventory.sh      # entrypoint: TCP -> UDP -> push NetBox -> push GLPI
-  run_inventory.sh          # host discovery + porte/servizi TCP
-  run_udp_enrichment.sh     # porte/servizi UDP + merge con TCP
-  scripts/                  # parsing XML Nmap, normalizzazione, push NetBox, Ansible
+  run_all_inventory.sh      # entry point: TCP -> UDP -> NetBox push -> GLPI push
+  run_inventory.sh          # host discovery + TCP ports/services
+  run_udp_enrichment.sh     # UDP ports/services + merge with TCP
+  scripts/                  # Nmap XML parsing, normalization, NetBox push, Ansible
 glpi-nmap-adapter/
-  nmap_to_glpi_nmap_asset.py  # push su custom asset GLPI via Legacy API
+  nmap_to_glpi_nmap_asset.py  # push to a GLPI custom asset via the Legacy API
 deploy/
-  inventory-nmap            # wrapper root: unico comando concesso via sudo
-  sudoers-inventory         # regola sudo ristretta al wrapper
-docs/                       # documentazione completa
+  inventory-nmap            # root wrapper: the only command allowed through sudo
+  sudoers-inventory         # sudo rule restricted to the wrapper
+docs/                       # full documentation
 ```
 
-## Requisiti
+## Requirements
 
 - Linux, `bash`, `nmap`, `python3`, `sudo`
-- Il wrapper `deploy/inventory-nmap` installato con la sua regola sudo (sezione seguente)
-- NetBox con i custom field sugli IP address (default: `porte_tcp`, `porte_udp`, `servizi_dettaglio`)
-- GLPI 11 con un custom asset `Nmap` e i tre campi custom (TCP, UDP, servizi), API Legacy abilitata
+- The `deploy/inventory-nmap` wrapper installed with its sudo rule (see below)
+- NetBox with custom fields on IP addresses (defaults: `tcp_ports`, `udp_ports`, `services_detail`)
+- GLPI 11 with an `Nmap` custom asset and three custom fields (TCP, UDP, services), Legacy API enabled
 
-## Installazione
+## Installation
 
-La pipeline gira con un utente di servizio senza privilegi (negli esempi `inventory`),
-proprietario della cartella del progetto.
+The pipeline runs as an unprivileged service user (`inventory` in the examples) that
+owns the project directory.
 
 ```bash
 sudo useradd --system --create-home --shell /bin/bash inventory
@@ -39,16 +39,16 @@ sudo git clone https://github.com/memorydumper23/inventory.git /opt/inventory
 sudo chown -R inventory: /opt/inventory
 ```
 
-## Configurazione
+## Configuration
 
-Nessuna credenziale è inclusa nel repository: ogni installazione deve fornire la propria.
-Esegui questi passi come utente `inventory` (`sudo -iu inventory`, poi `cd /opt/inventory`).
+No credentials are included in the repository: every installation provides its own.
+Run these steps as the `inventory` user (`sudo -iu inventory`, then `cd /opt/inventory`).
 
 ```bash
-# Target da scansionare (una subnet/host per riga)
+# Targets to scan (one subnet/host per line)
 cp nmap/targets.txt.example nmap/targets.txt
 
-# NetBox (+ opzioni Ansible / percorso adapter GLPI)
+# NetBox (+ Ansible options / GLPI adapter path)
 cp nmap/netbox.env.example nmap/netbox.env
 chmod 600 nmap/netbox.env
 
@@ -57,52 +57,51 @@ cp glpi-nmap-adapter/.env.example glpi-nmap-adapter/.env
 chmod 600 glpi-nmap-adapter/.env
 ```
 
-Modifica i file copiati sostituendo tutti i valori `CHANGE_ME` e gli URL di esempio.
-Gli script si rifiutano di partire se trovano credenziali mancanti o ancora a `CHANGE_ME`.
+Edit the copied files, replacing every `CHANGE_ME` value and the example URLs.
+The scripts refuse to start if credentials are missing or still set to `CHANGE_ME`.
 
-## Permessi di root per nmap
+## Root privileges for nmap
 
-Le scansioni SYN e UDP richiedono root, ma `sudo nmap` senza restrizioni equivale a
-dare root all'utente: `--script` esegue codice arbitrario, `-iL` legge qualunque file,
-`-oX` sovrascrive qualunque file. Per questo la pipeline non chiama mai nmap
-direttamente: usa il wrapper `inventory-nmap`, che accetta solo cinque profili di
-scansione a opzioni fisse, riceve i target da stdin e scrive l'XML su stdout
-(nmap come root non apre nessun file). L'unico parametro libero è una lista di porte
-numeriche.
+SYN and UDP scans need root, but unrestricted `sudo nmap` is the same as giving the
+user root: `--script` runs arbitrary code, `-iL` reads any file, `-oX` overwrites any
+file. This is why the pipeline never calls nmap directly: it uses the `inventory-nmap`
+wrapper, which accepts only five scan profiles with fixed options, reads the targets
+from stdin and writes the XML to stdout (nmap running as root opens no files). The only
+free parameter is a list of numeric ports.
 
-Da un utente amministratore, nella cartella `/opt/inventory`, installa wrapper e regola sudo:
+As an administrator, in `/opt/inventory`, install the wrapper and the sudo rule:
 
 ```bash
-# wrapper: deve essere di root e fuori dalla cartella del progetto,
-# altrimenti chi può modificarlo ottiene root
+# the wrapper must be owned by root and live outside the project directory,
+# otherwise whoever can modify it gets root
 sudo install -o root -g root -m 0755 deploy/inventory-nmap /usr/local/sbin/inventory-nmap
 
-# regola sudo: sostituisci "inventory" con il tuo utente, poi valida e installa
+# sudo rule: replace "inventory" with your user, then validate and install
 sudo visudo -cf deploy/sudoers-inventory
 sudo install -o root -g root -m 0440 deploy/sudoers-inventory /etc/sudoers.d/inventory
 
-# verifica: deve comparire solo /usr/local/sbin/inventory-nmap
+# check: only /usr/local/sbin/inventory-nmap must be listed
 sudo -l -U inventory
 ```
 
-Se in precedenza avevi una regola `NOPASSWD: /usr/bin/nmap`, rimuovila. Dopo ogni
-modifica a `deploy/inventory-nmap` ripeti il comando `install`.
+If you previously had a `NOPASSWD: /usr/bin/nmap` rule, remove it. After every change
+to `deploy/inventory-nmap`, run the `install` command again.
 
-## Installazione dipendenze
+## Dependencies
 
-Gli script in `nmap/` usano il Python di sistema (`/usr/bin/python3`). Su Debian/Ubuntu
-recenti `pip install` a livello di sistema è bloccato (PEP 668): installa i pacchetti
-della distribuzione.
+The scripts in `nmap/` use the system Python (`/usr/bin/python3`). On recent
+Debian/Ubuntu releases a system-wide `pip install` is blocked (PEP 668): install the
+distribution packages.
 
 ```bash
 # Debian/Ubuntu
 sudo apt install nmap python3-requests python3-yaml python3-venv
 
-# altre distribuzioni: pacchetti nell'utente inventory
+# other distributions: packages for the inventory user
 sudo -u inventory python3 -m pip install --user -r /opt/inventory/nmap/requirements.txt
 ```
 
-L'adapter GLPI usa un virtualenv proprio, da creare come utente `inventory`:
+The GLPI adapter uses its own virtualenv, to be created as the `inventory` user:
 
 ```bash
 cd /opt/inventory/glpi-nmap-adapter
@@ -110,40 +109,41 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-`run_all_inventory.sh` usa automaticamente `glpi-nmap-adapter/.venv` se presente.
+`run_all_inventory.sh` automatically uses `glpi-nmap-adapter/.venv` if present.
 
-## Esecuzione
+## Running
 
 ```bash
 sudo -u inventory /opt/inventory/nmap/run_all_inventory.sh
 ```
 
-Esempio cron dell'utente `inventory` (`sudo crontab -u inventory -e`), ogni notte alle 2:00:
+Example cron entry for the `inventory` user (`sudo crontab -u inventory -e`), every
+night at 2:00:
 
 ```
-0 2 * * * /opt/inventory/nmap/run_all_inventory.sh
+0 2 * * * umask 077; /opt/inventory/nmap/run_all_inventory.sh > /dev/null
 ```
 
-Flusso: host discovery → porte e servizi TCP → porte e servizi UDP → merge in
-`normalized_assets_merged_<data>.json` → push su NetBox (IP Address + custom field)
-→ push su GLPI (custom asset, nome = IP). I due push sono indipendenti: se uno
-fallisce l'altro viene comunque eseguito e lo script termina con exit code 1.
-Per disabilitarne uno imposta `PUSH_TO_NETBOX=false` o `PUSH_TO_GLPI=false` in `netbox.env`.
+Flow: host discovery → TCP ports and services → UDP ports and services → merge into
+`normalized_assets_merged_<date>.json` → push to NetBox (IP Address + custom fields)
+→ push to GLPI (custom asset, name = IP). The two pushes are independent: if one fails
+the other still runs and the script ends with exit code 1.
+To disable one, set `PUSH_TO_NETBOX=false` or `PUSH_TO_GLPI=false` in `netbox.env`.
 
-Output in `nmap/scans/` (XML Nmap), `nmap/work/` (JSON normalizzati) e `nmap/logs/`.
-Queste cartelle sono escluse da git perché contengono dati sulla rete scansionata.
+Output goes to `nmap/scans/` (Nmap XML), `nmap/work/` (normalized JSON) and `nmap/logs/`.
+These directories are excluded from git because they contain data about the scanned network.
 
-Test del push GLPI senza inviare nulla:
+Testing the GLPI push without sending anything:
 
 ```bash
 cd glpi-nmap-adapter
 .venv/bin/python nmap_to_glpi_nmap_asset.py -i ../nmap/work/normalized_assets_merged_YYYY-MM-DD.json -f json --dry-run
 ```
 
-Aggiungi `--verbose` per stampare endpoint e payload di ogni richiesta durante un push reale.
+Add `--verbose` to print endpoint and payload of every request during a real push.
 
-> ⚠️ Scansiona solo reti di tua proprietà o per cui hai autorizzazione esplicita.
+> ⚠️ Only scan networks you own or are explicitly authorized to scan.
 
-## Licenza
+## License
 
 [MIT](LICENSE)

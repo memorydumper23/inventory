@@ -29,7 +29,7 @@ def load_env() -> Dict[str, str]:
     if not cfg["GLPI_LEGACY_API_URL"] and cfg["GLPI_BASE_URL"]:
         cfg["GLPI_LEGACY_API_URL"] = f"{cfg['GLPI_BASE_URL']}/apirest.php"
 
-    # Percorso relativo dello state file = relativo alla cartella dello script
+    # A relative state file path is relative to this script's directory
     if not os.path.isabs(cfg["STATE_FILE"]):
         cfg["STATE_FILE"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), cfg["STATE_FILE"])
 
@@ -43,8 +43,8 @@ def check_required_env(cfg: Dict[str, str]) -> None:
         missing.append("GLPI_LEGACY_APP_TOKEN")
     if missing:
         raise SystemExit(
-            f"[ERRORE] Configurazione mancante: {', '.join(missing)}. "
-            "Copia .env.example in .env e inserisci i tuoi valori."
+            f"[ERROR] Missing configuration: {', '.join(missing)}. "
+            "Copy .env.example to .env and fill in your values."
         )
 
 
@@ -54,7 +54,7 @@ def encoded_itemtype(cfg: Dict[str, str]) -> str:
 
 def init_legacy_session(cfg: Dict[str, str]) -> str:
     """
-    Legacy API initSession con Basic Auth + App-Token (opzionale ma consigliato).
+    Legacy API initSession with Basic Auth + App-Token (optional but recommended).
     """
     timeout = int(cfg["GLPI_HTTP_TIMEOUT"])
     url = f"{cfg['GLPI_LEGACY_API_URL']}/initSession"
@@ -74,14 +74,14 @@ def init_legacy_session(cfg: Dict[str, str]) -> str:
     )
 
     if r.status_code >= 400:
-        print(f"[ERRORE] initSession HTTP {r.status_code}: {r.text.strip()}", file=sys.stderr)
+        print(f"[ERROR] initSession HTTP {r.status_code}: {r.text.strip()}", file=sys.stderr)
 
     r.raise_for_status()
 
     data = r.json()
     session_token = data.get("session_token")
     if not session_token:
-        raise RuntimeError(f"Nessun session_token ricevuto da initSession: {data}")
+        raise RuntimeError(f"No session_token received from initSession: {data}")
 
     return session_token
 
@@ -105,15 +105,15 @@ def kill_legacy_session(cfg: Dict[str, str], session_token: str) -> None:
 
 def parse_normalized_json(path: str) -> List[Dict[str, Any]]:
     """
-    Supporta:
-    1) lista diretta di host
+    Supports:
+    1) a plain list of hosts
     2) {"hosts": [...]}
     3) {"assets": [...]}
     4) {"results": [...]}
     5) {"data": [...]}
     6) {"items": [...]}
     7) {"devices": [...]}
-    8) dizionario keyed-by-id / keyed-by-ip
+    8) a dictionary keyed by id / keyed by IP
     """
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -135,9 +135,9 @@ def parse_normalized_json(path: str) -> List[Dict[str, Any]]:
 
     if candidate is None:
         raise ValueError(
-            "Formato JSON non supportato. Attesi: lista diretta, "
-            "oppure oggetto con chiave hosts/assets/results/data/items/devices, "
-            "oppure dizionario keyed-by-id."
+            "Unsupported JSON format. Expected: a plain list, "
+            "an object with a hosts/assets/results/data/items/devices key, "
+            "or a dictionary keyed by id."
         )
 
     out: List[Dict[str, Any]] = []
@@ -199,7 +199,7 @@ def parse_normalized_json(path: str) -> List[Dict[str, Any]]:
         })
 
     if not out:
-        raise ValueError("Nessun host valido con IP estratto dal JSON.")
+        raise ValueError("No valid host with an IP found in the JSON.")
 
     return out
 
@@ -214,11 +214,11 @@ def compact_ports(host: Dict[str, Any], proto: str) -> str:
 
 def compact_services(host: Dict[str, Any]) -> str:
     """
-    Formato ibrido:
-    - nel dettaglio GLPI: un servizio per riga
-    - nella lista GLPI: i \n vengono appiattiti, ma restano i bullet visibili
+    Hybrid format:
+    - GLPI detail view: one service per line
+    - GLPI list view: the \n are flattened, but the bullets stay visible
 
-    Esempio:
+    Example:
     • 22/ssh [OpenSSH 9.x protocol 2.0]
     • 80/http [nginx 1.x]
     • 123/ntp
@@ -249,9 +249,9 @@ def compact_services(host: Dict[str, Any]) -> str:
 
 def build_payload(host: Dict[str, Any], cfg: Dict[str, str]) -> Dict[str, Any]:
     """
-    Regola richiesta:
+    Rules:
     - name = IP
-    - solo 3 campi custom text:
+    - only 3 custom text fields:
       * tcp_ports
       * udp_ports
       * services
@@ -284,7 +284,7 @@ def save_state(path: str, state: Dict[str, Any]) -> None:
 
 def extract_id_from_response(resp: requests.Response) -> int:
     """
-    Prova a ricavare l'ID da varie forme di risposta della Legacy API.
+    Try to extract the ID from the various response shapes of the Legacy API.
     """
     try:
         data = resp.json()
@@ -345,12 +345,12 @@ def update_item(cfg: Dict[str, str], session_token: str, item_id: int, payload: 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Push Nmap JSON nel custom asset GLPI 'Nmap' via Legacy API")
-    parser.add_argument("-i", "--input", required=True, help="File JSON normalizzato")
-    parser.add_argument("-f", "--format", choices=["json"], required=True, help="Formato input")
-    parser.add_argument("--dry-run", action="store_true", help="Stampa solo i payload, non invia")
-    parser.add_argument("--only-ip", help="Processa un solo host per IP")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Stampa endpoint e payload di ogni richiesta")
+    parser = argparse.ArgumentParser(description="Push Nmap JSON to the GLPI 'Nmap' custom asset via the Legacy API")
+    parser.add_argument("-i", "--input", required=True, help="Normalized JSON file")
+    parser.add_argument("-f", "--format", choices=["json"], required=True, help="Input format")
+    parser.add_argument("--dry-run", action="store_true", help="Only print the payloads, send nothing")
+    parser.add_argument("--only-ip", help="Process a single host, by IP")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Print endpoint and payload of every request")
     args = parser.parse_args()
 
     cfg = load_env()
@@ -360,7 +360,7 @@ def main() -> None:
         hosts = [h for h in hosts if h["ip"] == args.only_ip]
 
     if not hosts:
-        print("Nessun host da processare.")
+        print("No hosts to process.")
         return
 
     state = load_state(cfg["STATE_FILE"])
@@ -369,7 +369,7 @@ def main() -> None:
     if not args.dry_run:
         check_required_env(cfg)
         session_token = init_legacy_session(cfg)
-        print("[+] Session token Legacy API ottenuto correttamente.")
+        print("[+] Legacy API session token obtained.")
 
     ok = 0
     ko = 0
@@ -389,7 +389,7 @@ def main() -> None:
                 if item_id:
                     r = update_item(cfg, session_token, item_id, payload, args.verbose)
 
-                    # Se update fallisce perché l'ID non esiste più, ricrea
+                    # If the update fails because the ID no longer exists, recreate it
                     if r.status_code == 404:
                         r = create_item(cfg, session_token, payload, args.verbose)
                         new_id = extract_id_from_response(r)
@@ -420,7 +420,7 @@ def main() -> None:
         if session_token:
             kill_legacy_session(cfg, session_token)
 
-    print(f"\nCompletato. Successi: {ok} | Errori: {ko}")
+    print(f"\nDone. Succeeded: {ok} | Errors: {ko}")
     if ko:
         raise SystemExit(1)
 

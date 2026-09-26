@@ -10,13 +10,13 @@ def load_assets(path):
             data = json.load(f)
         return data.get("assets", [])
     except Exception as exc:
-        raise RuntimeError(f"Impossibile leggere {path}: {exc}") from exc
+        raise RuntimeError(f"Cannot read {path}: {exc}") from exc
 
 
 def merge_service(host_services, new_service):
     for svc in host_services:
         if svc.get("port") == new_service.get("port") and svc.get("protocol") == new_service.get("protocol"):
-            # Preferisci "open" a "open|filtered" se disponibile
+            # Prefer "open" over "open|filtered" when available
             old_state = svc.get("state")
             new_state = new_service.get("state")
             if old_state != "open" and new_state:
@@ -30,17 +30,17 @@ def merge_service(host_services, new_service):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Merge di asset TCP e UDP")
-    parser.add_argument("--tcp", required=True, help="JSON normalized TCP")
-    parser.add_argument("--udp", required=True, help="JSON normalized UDP")
-    parser.add_argument("--output", required=True, help="JSON merged output")
+    parser = argparse.ArgumentParser(description="Merge TCP and UDP assets")
+    parser.add_argument("--tcp", required=True, help="Normalized TCP JSON")
+    parser.add_argument("--udp", required=True, help="Normalized UDP JSON")
+    parser.add_argument("--output", required=True, help="Merged output JSON")
     args = parser.parse_args()
 
     try:
         tcp_assets = load_assets(args.tcp)
         udp_assets = load_assets(args.udp)
     except Exception as exc:
-        print(f"[ERRORE] {exc}", file=sys.stderr)
+        print(f"[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
 
     merged = {}
@@ -92,7 +92,7 @@ def main():
         with open(args.output, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
     except Exception as exc:
-        print(f"[ERRORE] Impossibile scrivere {args.output}: {exc}", file=sys.stderr)
+        print(f"[ERROR] Cannot write {args.output}: {exc}", file=sys.stderr)
         sys.exit(1)
 
 
